@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Estudia la Ley 2196 de 2022 con casos prácticos, pistas, explicaciones y un banco ampliable.">
+    <title>
+      Reto disciplinario · Ley 2196
+    </title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer>
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <div class="brand">
+          <div class="mark" aria-hidden="true">
+            §
+          </div>
+          <div>
+            <strong>
+              Reto disciplinario
+            </strong>
+            <small>
+              Estatuto Disciplinario Policial
+            </small>
+          </div>
+        </div>
+        <button class="btn ghost" id="openEditor">
+          ＋ Añadir preguntas
+        </button>
+      </header>
+      <div class="intro">
+        <div>
+          <div class="eyebrow">
+            Ley 2196 de 2022
+          </div>
+          <h1>
+            Comprende. Resuelve. Recuerda.
+          </h1>
+          <p>
+            Casos prácticos para entrenar tu criterio disciplinario.
+          </p>
+        </div>
+        <div class="edition">
+          ESTUDIO INTERACTIVO
+          <br>
+          <span id="bankCount">
+            60 preguntas disponibles
+          </span>
+        </div>
+      </div>
+      <main class="layout">
+        <aside class="sidebar">
+          <section class="sidebox settings">
+            <h3>
+              Tu entrenamiento
+            </h3>
+            <div class="settings-grid">
+              <label class="field">
+                Modalidad
+                <select id="mode">
+                  <option value="study">
+                    Aprender con explicación
+                  </option>
+                  <option value="exam">
+                    Simulacro · revisión al final
+                  </option>
+                </select>
+              </label>
+              <fieldset class="topic-picker">
+                <legend>
+                  Leyes y subtemas
+                </legend>
+                <div class="topic-actions">
+                  <button type="button" id="selectAllTopics">
+                    Seleccionar todos
+                  </button>
+                  <button type="button" id="clearTopics">
+                    Limpiar selección
+                  </button>
+                </div>
+                <div id="topicChecks" class="topic-list">
+                </div>
+                <p id="topicSummary" class="mini" role="status" aria-live="polite">
+                </p>
+              </fieldset>
+              <label class="field">
+                Preguntas
+                <select id="limit">
+                  <option value="all">
+                    Todas las disponibles
+                  </option>
+                  <option value="10">
+                    Ronda de 10
+                  </option>
+                  <option value="15">
+                    Ronda de 15
+                  </option>
+                </select>
+              </label>
+              <label class="checks">
+                <input type="checkbox" id="shuffle" checked>
+                Mezclar preguntas
+              </label>
+            </div>
+            <button class="btn primary" id="start">
+              Comenzar ronda
+            </button>
+            <p class="mini" id="roundNote" style="margin:12px 0 0">
+              Cambia las opciones y comienza una nueva ronda.
+            </p>
+          </section>
+          <section class="sidebox memorybox">
+            <div class="eyebrow">
+              Mapa de memoria
+            </div>
+            <div class="memory">
+              <b>
+                45
+              </b>
+              <span>
+                Faltas gravísimas
+              </span>
+            </div>
+            <div class="memory">
+              <b>
+                46
+              </b>
+              <span>
+                Faltas graves
+              </span>
+            </div>
+            <div class="memory">
+              <b>
+                47
+              </b>
+              <span>
+                Leves por remisión
+              </span>
+            </div>
+            <div class="memory">
+              <b>
+                48
+              </b>
+              <span>
+                Criterios de clasificación
+              </span>
+            </div>
+            <p class="mini" style="margin:18px 0 0">
+              Gravedad de la falta y culpabilidad se analizan por separado.
+            </p>
+          </section>
+        </aside>
+        <section aria-label="Juego de preguntas">
+          <div class="stats">
+            <div class="stat">
+              <strong id="answered">
+                0 / 60
+              </strong>
+              <span>
+                Respuestas registradas
+              </span>
+            </div>
+            <div class="stat">
+              <strong id="points">
+                0
+              </strong>
+              <span id="pointsLabel">
+                Aciertos
+              </span>
+            </div>
+            <div class="stat">
+              <strong id="streak">
+                0
+              </strong>
+              <span id="streakLabel">
+                Racha actual
+              </span>
+            </div>
+          </div>
+          <div class="progress" role="progressbar" aria-label="Avance de la ronda" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="bar">
+            </div>
+          </div>
+          <div class="quiz" id="game">
+          </div>
+          <div class="below">
+            <span>
+              1 punto por acierto · meta: 90 %
+            </span>
+            <span>
+              Teclas 1–4: responder · Enter: continuar
+            </span>
+          </div>
+        </section>
+      </main>
+      <footer class="foot">
+        <span>
+          Material de estudio. La responsabilidad requiere prueba, culpabilidad y debido proceso.
+        </span>
+        <a href="https://www.alcaldiabogota.gov.co/sisjur/normas/Norma1.jsp?i=120378" target="_blank" rel="noopener noreferrer">
+          Consultar texto de la ley
+        </a>
+      </footer>
+    </div>
+    <dialog id="editor" aria-labelledby="editorTitle">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow" style="color:var(--muted)">
+            Banco ampliable
+          </div>
+          <h2 id="editorTitle">
+            Añade un nuevo caso
+          </h2>
+        </div>
+        <button id="closeEditor" aria-label="Cerrar">
+          ✕
+        </button>
+      </div>
+      <p class="editor-note">
+        Las preguntas nuevas se guardan en este navegador. Descarga el index actualizado y mantenlo junto a styles.css y app.js.
+      </p>
+      <form id="questionForm">
+        <div class="editor-grid">
+          <label class="field full">
+            Caso o pregunta
+            <textarea name="question" rows="3" required maxlength="1800">
+            </textarea>
+          </label>
+          <label class="field">
+            Ley
+            <select name="law" id="questionLaw">
+            </select>
+          </label>
+          <label class="field">
+            Subtema
+            <input name="topic" value="Clasificación" required maxlength="80">
+          </label>
+          <label class="field">
+            Artículo y numeral
+            <input name="reference" placeholder="Ej.: Art. 46.1" required maxlength="120">
+          </label>
+          <label class="field">
+            Opción A
+            <input name="option0" required maxlength="350">
+          </label>
+          <label class="field">
+            Opción B
+            <input name="option1" required maxlength="350">
+          </label>
+          <label class="field">
+            Opción C
+            <input name="option2" required maxlength="350">
+          </label>
+          <label class="field">
+            Opción D
+            <input name="option3" required maxlength="350">
+          </label>
+          <label class="field full">
+            Respuesta correcta
+            <select name="answer">
+              <option value="0">
+                A
+              </option>
+              <option value="1">
+                B
+              </option>
+              <option value="2">
+                C
+              </option>
+              <option value="3">
+                D
+              </option>
+            </select>
+          </label>
+          <label class="field full">
+            Explicación jurídica
+            <textarea name="explanation" rows="2" required maxlength="2000">
+            </textarea>
+          </label>
+          <label class="field full">
+            Pista sin revelar la respuesta
+            <input name="hint" required maxlength="400">
+          </label>
+        </div>
+        <button class="btn primary" type="submit">
+          Guardar pregunta
+        </button>
+        <p id="formMessage" class="editor-note" role="status">
+        </p>
+      </form>
+      <hr style="border:0;border-top:1px solid #c8d5ca;margin:22px 0">
+      <div class="editor-actions">
+        <button class="btn light" id="downloadHtml">
+          Descargar index actualizado
+        </button>
+        <button class="btn light" id="exportBank">
+          Exportar banco JSON
+        </button>
+        <button class="btn light" id="importBank">
+          Importar preguntas JSON
+        </button>
+        <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="editor-note" style="margin:14px 0 0">
+        Para ampliar desde el código: agrega objetos al bloque QUESTION_BANK en app.js. Usa law para la ley y topic para el subtema. Cada pregunta necesita cuatro opciones y answer entre 0 y 3. Verifica las referencias jurídicas antes de incorporarlas.
+      </p>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden>
+    </div>
+    <div id="confetti" aria-hidden="true">
+    </div>
+    <!-- El catálogo y las preguntas están en app.js. -->
+  </body>
+</html>
