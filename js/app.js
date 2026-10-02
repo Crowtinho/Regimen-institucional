@@ -2,14 +2,16 @@
 
 import { QUESTION_BANK } from './questionBank.js';
 import { DEFAULT_LAW_CATALOG } from './lawCatalog.js';
+import {
+  renderTopicIndicators,
+  syncQuestionLimit,
+  bindQuestionLimit
+} from './topicIndicators.js';
 
-/* =====================================================================
-   1. DATOS Y PERSISTENCIA
-   ===================================================================== */
+/* 1. DATOS */
 
 const STORAGE_KEY = 'reto-2196-custom-v1';
 const PROGRESS_KEY = 'reto-2196-progress-v1';
-
 const $ = id => document.getElementById(id);
 
 const BASE_QUESTIONS = $('QUESTION_BANK')
@@ -20,7 +22,6 @@ const LAW_CATALOG = $('LAW_CATALOG')
   ? JSON.parse($('LAW_CATALOG').textContent)
   : DEFAULT_LAW_CATALOG;
 
-// Compatibilidad con preguntas antiguas.
 function questionLaw(q) {
   return q.law || 'Ley 2196';
 }
@@ -90,7 +91,7 @@ function persistCustom() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(customQuestions));
     return true;
   } catch {
-    toast('Pregunta añadida a esta sesión. Exporta el banco para conservarla.');
+    toast('No se pudo guardar el banco. Expórtalo para conservarlo.');
     return false;
   }
 }
@@ -106,9 +107,7 @@ function shuffleArray(items) {
   return copy;
 }
 
-/* =====================================================================
-   2. ESTADO Y GUARDADO DEL PROGRESO
-   ===================================================================== */
+/* 2. ESTADO Y PERSISTENCIA DE LA RONDA */
 
 let state = {
   questions: [],
@@ -120,10 +119,12 @@ let state = {
 
 let storageWarningShown = false;
 
+const topicIndicatorsContainer = document.createElement('div');
+topicIndicatorsContainer.id = 'topicIndicators';
+$('game').after(topicIndicatorsContainer);
+
 function persistProgress() {
   try {
-    // Los aciertos y errores se calculan a partir de estas respuestas.
-    // No se duplica el contenido del banco.
     localStorage.setItem(PROGRESS_KEY, JSON.stringify({
       version: 1,
       questionIds: state.questions.map(q => q.id),
@@ -179,7 +180,6 @@ function restoreProgress() {
       throw new Error('Faltan preguntas de la ronda guardada');
     }
 
-    // Solo se aceptan respuestas consecutivas.
     const validPosition = saved.finished
       ? saved.answers.length === questions.length &&
         saved.index === questions.length - 1
@@ -211,9 +211,7 @@ function restoreProgress() {
   }
 }
 
-/* =====================================================================
-   3. CANTIDAD DE PREGUNTAS Y NUEVA RONDA
-   ===================================================================== */
+/* 3. CANTIDAD DE PREGUNTAS */
 
 function configureQuestionLimit() {
   const previous = $('limit');
@@ -224,12 +222,10 @@ function configureQuestionLimit() {
   input.name = previous.name || 'limit';
   input.type = 'number';
   input.min = '1';
-  input.step = '10';
+  input.step = '1';
   input.inputMode = 'numeric';
   input.value = '10';
-
   input.setAttribute('aria-label', 'Cantidad de preguntas');
-  input.title = 'Escribe una cantidad o usa las flechas de 10 en 10';
 
   previous.replaceWith(input);
 }
@@ -243,27 +239,31 @@ function startRound(explicitQuestions) {
     return;
   }
 
-  let requested;
-
   if (!explicitQuestions) {
-    requested = Number($('limit').value);
+    const requested = Number($('limit').value);
 
     if (!Number.isSafeInteger(requested) || requested < 1) {
       toast('Escribe una cantidad entera mayor que cero.');
       $('limit').focus();
       return;
     }
-  }
 
-  if ($('shuffle').checked) {
+    if (requested > pool.length) {
+      $('limit').value = String(pool.length);
+      toast(`Hay ${pool.length} preguntas disponibles para esta selección.`);
+      $('limit').focus();
+      return;
+    }
+
+    if ($('shuffle').checked) {
+      pool = shuffleArray(pool);
+    }
+
+    pool = pool.slice(0, requested);
+  } else if ($('shuffle').checked) {
     pool = shuffleArray(pool);
   }
 
-  if (!explicitQuestions) {
-    pool = pool.slice(0, requested);
-  }
-
-  // Comenzar una ronda reinicia el avance anterior.
   state = {
     questions: pool,
     index: 0,
@@ -322,16 +322,12 @@ function updateStats() {
     ?.setAttribute('aria-valuenow', String(percent));
 }
 
-/* =====================================================================
-   4. RENDERIZADO DEL JUEGO
-   ===================================================================== */
+/* 4. ELEMENTOS Y RENDERIZADO */
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
-
   if (text !== undefined) node.textContent = text;
   if (className) node.className = className;
-
   return node;
 }
 
@@ -344,6 +340,7 @@ function action(text, className, handler) {
 
 function render() {
   updateStats();
+  renderTopicIndicators(state, topicIndicatorsContainer);
 
   const game = $('game');
   game.replaceChildren();
@@ -442,21 +439,14 @@ function render() {
         ? 'Consultar pista'
         : 'Ocultar pista';
 
-      hintButton.setAttribute(
-        'aria-expanded',
-        String(!hint.hidden)
-      );
+      hintButton.setAttribute('aria-expanded', String(!hint.hidden));
     });
 
     hintButton.setAttribute('aria-controls', 'hintText');
     hintButton.setAttribute('aria-expanded', 'false');
     tools.append(hintButton);
   } else {
-    tools.append(el(
-      'span',
-      'Sin pistas · corrección al final',
-      'ref'
-    ));
+    tools.append(el('span', 'Sin pistas · corrección al final', 'ref'));
   }
 
   const next = action(
@@ -522,7 +512,6 @@ function answerQuestion(index) {
 
   state.answers[state.index] = index;
 
-  // Se guarda antes de actualizar la pantalla.
   persistProgress();
   render();
 
@@ -549,7 +538,6 @@ function nextQuestion() {
 
   if (state.index + 1 >= state.questions.length) {
     state.finished = true;
-
     persistProgress();
     render();
 
@@ -558,10 +546,8 @@ function nextQuestion() {
     }
   } else {
     state.index++;
-
     persistProgress();
     render();
-
     $('currentQuestion')?.focus({ preventScroll: true });
   }
 }
@@ -571,7 +557,6 @@ function renderResults() {
   const { hits } = metrics();
   const total = state.questions.length;
   const percent = total ? Math.round(hits / total * 100) : 0;
-
   const box = el('div', undefined, 'results animate');
 
   box.append(
@@ -609,12 +594,7 @@ function renderResults() {
     ));
   }
 
-  actions.append(action(
-    'Nueva ronda',
-    'light',
-    () => startRound()
-  ));
-
+  actions.append(action('Nueva ronda', 'light', () => startRound()));
   box.append(actions);
 
   const review = el('div', undefined, 'review');
@@ -640,30 +620,20 @@ function renderResults() {
   game.append(box);
 }
 
-/* =====================================================================
-   5. MENÚ DE LEYES Y SUBTEMAS
-   ===================================================================== */
+/* 5. LEYES Y SUBTEMAS */
 
 let selectedTopics = new Set();
 let knownTopics = new Set();
-
 const collapsedLaws = new Set();
 
 function getLawGroups() {
   const groups = new Map(
-    LAW_CATALOG.map(group => [
-      group.law,
-      new Set(group.topics)
-    ])
+    LAW_CATALOG.map(group => [group.law, new Set(group.topics)])
   );
 
   getBank().forEach(q => {
     const law = questionLaw(q);
-
-    if (!groups.has(law)) {
-      groups.set(law, new Set());
-    }
-
+    if (!groups.has(law)) groups.set(law, new Set());
     groups.get(law).add(q.topic);
   });
 
@@ -674,9 +644,7 @@ function getLawGroups() {
 }
 
 function updateTopicSummary() {
-  const bank = getBank();
-
-  const count = bank.filter(
+  const count = getBank().filter(
     q => selectedTopics.has(questionKey(q))
   ).length;
 
@@ -693,6 +661,8 @@ function updateTopicSummary() {
 
   $('topicSummary').classList.toggle('empty-selection', count === 0);
   $('start').disabled = count === 0;
+
+  syncQuestionLimit($('limit'), count);
 }
 
 function refreshBankUI() {
@@ -703,7 +673,6 @@ function refreshBankUI() {
     group.topics.map(topic => topicKey(group.law, topic))
   );
 
-  // Selecciona inicialmente los subtemas que tienen preguntas.
   keys.forEach(key => {
     if (
       !knownTopics.has(key) &&
@@ -718,7 +687,6 @@ function refreshBankUI() {
   );
 
   knownTopics = new Set(keys);
-
   $('topicChecks').replaceChildren();
 
   groups.forEach((group, groupIndex) => {
@@ -747,15 +715,11 @@ function refreshBankUI() {
 
     parent.addEventListener('change', () => {
       groupKeys.forEach(key => {
-        if (parent.checked) {
-          selectedTopics.add(key);
-        } else {
-          selectedTopics.delete(key);
-        }
+        if (parent.checked) selectedTopics.add(key);
+        else selectedTopics.delete(key);
       });
 
       refreshBankUI();
-
       $('law-' + groupIndex)?.focus({ preventScroll: true });
     });
 
@@ -787,20 +751,13 @@ function refreshBankUI() {
       String(!collapsedLaws.has(group.law))
     );
 
-    toggle.setAttribute(
-      'aria-controls',
-      'law-topics-' + groupIndex
-    );
+    toggle.setAttribute('aria-controls', 'law-topics-' + groupIndex);
 
     toggle.addEventListener('click', () => {
-      if (collapsedLaws.has(group.law)) {
-        collapsedLaws.delete(group.law);
-      } else {
-        collapsedLaws.add(group.law);
-      }
+      if (collapsedLaws.has(group.law)) collapsedLaws.delete(group.law);
+      else collapsedLaws.add(group.law);
 
       refreshBankUI();
-
       $('fold-' + groupIndex)?.focus({ preventScroll: true });
     });
 
@@ -814,7 +771,6 @@ function refreshBankUI() {
     group.topics.forEach((topic, topicIndex) => {
       const key = topicKey(group.law, topic);
       const count = bank.filter(q => questionKey(q) === key).length;
-
       const label = el('label', undefined, 'topic-check');
       const checkbox = el('input');
 
@@ -823,14 +779,10 @@ function refreshBankUI() {
       checkbox.checked = selectedTopics.has(key);
 
       checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          selectedTopics.add(key);
-        } else {
-          selectedTopics.delete(key);
-        }
+        if (checkbox.checked) selectedTopics.add(key);
+        else selectedTopics.delete(key);
 
         refreshBankUI();
-
         $(checkbox.id)?.focus({ preventScroll: true });
       });
 
@@ -861,7 +813,6 @@ function refreshBankUI() {
   }
 
   $('bankCount').textContent = `${bank.length} preguntas disponibles`;
-
   updateTopicSummary();
 }
 
@@ -875,16 +826,13 @@ $('clearTopics').addEventListener('click', () => {
   refreshBankUI();
 });
 
-/* =====================================================================
-   6. AVISOS Y DESCARGAS
-   ===================================================================== */
+/* 6. AVISOS Y DESCARGAS */
 
 let toastTimer;
 
 function toast(message) {
   $('toast').textContent = message;
   $('toast').hidden = false;
-
   clearTimeout(toastTimer);
 
   toastTimer = setTimeout(() => {
@@ -899,7 +847,6 @@ function download(content, filename, type) {
 
   link.href = url;
   link.download = filename;
-
   document.body.append(link);
   link.click();
   link.remove();
@@ -907,13 +854,10 @@ function download(content, filename, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-/* =====================================================================
-   7. BANCO AMPLIABLE
-   ===================================================================== */
+/* 7. BANCO AMPLIABLE */
 
 $('questionForm').addEventListener('submit', event => {
   event.preventDefault();
-
   const form = new FormData(event.target);
 
   const question = {
@@ -922,9 +866,7 @@ $('questionForm').addEventListener('submit', event => {
     law: form.get('law'),
     topic: form.get('topic').trim(),
     question: form.get('question').trim(),
-    options: [0, 1, 2, 3].map(
-      i => form.get('option' + i).trim()
-    ),
+    options: [0, 1, 2, 3].map(i => form.get('option' + i).trim()),
     answer: Number(form.get('answer')),
     reference: form.get('reference').trim(),
     explanation: form.get('explanation').trim(),
@@ -938,7 +880,6 @@ $('questionForm').addEventListener('submit', event => {
   }
 
   customQuestions.push(question);
-
   const saved = persistCustom();
 
   refreshBankUI();
@@ -948,7 +889,11 @@ $('questionForm').addEventListener('submit', event => {
     ? 'Pregunta guardada. Estará disponible al comenzar una nueva ronda.'
     : 'Pregunta añadida a la sesión; exporta el banco para conservarla.';
 
-  toast('Nuevo caso añadido al banco.');
+  toast(
+    saved
+      ? 'Nuevo caso añadido al banco.'
+      : 'Caso añadido a la sesión. Exporta el banco para conservarlo.'
+  );
 });
 
 $('exportBank').addEventListener('click', () => {
@@ -987,6 +932,10 @@ $('downloadHtml').addEventListener('click', () => {
     .replace(/</g, '\\u003c');
 
   clone.querySelector('#game').replaceChildren();
+
+  // El contenedor se crea de nuevo al iniciar app.js.
+  clone.querySelector('#topicIndicators')?.remove();
+
   clone.querySelector('#editor').removeAttribute('open');
   clone.querySelector('#confetti').replaceChildren();
   clone.querySelector('#toast').hidden = true;
@@ -999,7 +948,7 @@ $('downloadHtml').addEventListener('click', () => {
   );
 
   toast(
-    'Index actualizado descargado. Conserva styles.css, app.js, ' +
+    'Index descargado. Conserva styles.css, app.js, topicIndicators.js, ' +
     'questionBank.js y lawCatalog.js en la misma carpeta.'
   );
 });
@@ -1039,7 +988,6 @@ $('jsonFile').addEventListener('change', async event => {
     const fresh = data.filter(q => !ids.has(q.id));
 
     customQuestions.push(...fresh);
-
     const saved = persistCustom();
     refreshBankUI();
 
@@ -1055,9 +1003,7 @@ $('jsonFile').addEventListener('change', async event => {
   }
 });
 
-/* =====================================================================
-   8. EVENTOS Y ANIMACIONES
-   ===================================================================== */
+/* 8. EVENTOS Y ANIMACIONES */
 
 $('openEditor').addEventListener('click', () => {
   $('editor').showModal();
@@ -1067,7 +1013,6 @@ $('closeEditor').addEventListener('click', () => {
   $('editor').close();
 });
 
-// Reinicia directamente y reemplaza el progreso guardado.
 $('start').addEventListener('click', () => {
   startRound();
 });
@@ -1097,9 +1042,7 @@ document.addEventListener('keydown', event => {
 });
 
 function celebrate() {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return;
-  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const container = $('confetti');
   container.replaceChildren();
@@ -1109,27 +1052,24 @@ function celebrate() {
 
     particle.style.left = Math.random() * 100 + '%';
     particle.style.background = [
-      '#ccf26e',
-      '#68beba',
-      '#f6d16d'
+      '#ccf26e', '#68beba', '#f6d16d'
     ][i % 3];
 
     particle.style.animationDelay = Math.random() * .5 + 's';
-
     container.append(particle);
   }
 
   setTimeout(() => container.replaceChildren(), 2600);
 }
 
-/* =====================================================================
-   9. INICIO
-   ===================================================================== */
+/* 9. INICIO */
 
 configureQuestionLimit();
+bindQuestionLimit($('limit'));
 refreshBankUI();
 
 if (restoreProgress()) {
+  updateTopicSummary();
   render();
 } else {
   startRound();
